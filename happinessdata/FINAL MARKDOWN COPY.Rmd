@@ -1,0 +1,425 @@
+---
+title: The Determination of Government Structure, Social Support, and Economic Development
+  on Citizen Happiness Level
+author: "Shashwat Bansal, Allen Chen, Anni Wang, Ram Mukund Kripa, and Robert Lee"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+## you can edit this code chunk to change defaults for this file (ex: show all code, only show output, don't show warning etc)
+# update defaults with the gear icon on the right
+knitr::opts_chunk$set(
+	echo = FALSE,
+	message = FALSE,
+	warning = FALSE,
+	fig.width=10, 
+	fig.height=6
+)
+```
+
+```{r}
+# make sure you add any packages you'll need in this file here (otherwise it won't knit)
+library(dplyr)
+library(ggplot2)
+library(ggpubr)
+```
+
+```{r}
+# read in the dataset
+#WHR20_data = read.csv("~/Desktop/Data/WHR20_data.csv")
+#WHR20_previous_years = read.csv("~/Desktop/Data/WHR20_previous_years.csv")
+data2019 = WHR20_data
+dataprev = WHR20_previous_years
+```
+
+### Introduction
+
+Utilizing the World Happiness Report of 2019 and the historical records of country happiness published by previous reports, the goal of the primary investigation is to determine the primary causation for "happiness" by analyzing the relationships between citizen happiness, availability of social support, regional indicators, GDP per capita, life expectancy, freedom to make choices, generosity, and perceptions of corruption. Although we recognize that a positive correlation between two variables does not necessarily determine the causation of happiness within a specific country, positive correlations between variables (such as availability of social support), etc. indicate other factors related towards the positive correlation, revealing insight into areas of expansion, future growth, and current problems within the economies of listed countries. We developed our own "segmenting" strategies with the intent to utilize hypothesis tests that included t-tests, z-tests, ANOVA, Tukey, and chi-squared tests - our strategy included separating countries based on their log GDP per capita into rich, middle, and poor countries. Through our project, we intend to address the following questions with our data analysis and supporting supplementary research:
+
+1) What is the effect of GDP per capita and categories of wealth on happiness levels?
+
+2) How are GDP per capita and country wealth related to perceptions of corruption - and specifically, is the level of corruption related to happiness levels?
+
+3) Does the amount of social support in the respective group of countries affect the healthy life expectancy of the people? Also, does the healthy life expectancy affect the happiness level in each respective group of countries?
+
+4) What is the relative affect of freedom of life choices on happiness levels, specifically the relationship between social support and freedom to make life choices?
+
+### Section A: GDP per capita and categories of wealth on happiness levels
+
+#### Exploratory Data Analysis
+
+One of the first ideas that we got from this dataset was to explore the correlation between GDP and Happiness. Higher values of Log GDP per capita seemed to correspond to higher happiness ladder scores. This makes intuitive sense. While correlation does not imply causation, it would seem logical to conclude that higher GDP implies happier people.
+
+```{r}
+# for all years
+ggplot(dataprev,aes(x=Log.GDP.per.capita,y=Life.Ladder,color=factor(year)))+
+  geom_point()+
+  geom_smooth(method='lm',color = 'black')+
+  ggtitle("Correlation between Happiness and GDP (Ram Mukund Kripa)")+
+  labs(x="Logged GDP per capita",y="Happiness Score")
+x = lm(Log.GDP.per.capita ~ Life.Ladder,dataprev)
+summary(x)
+
+```
+
+We also looked at the p value associated with the slope of the regression line produced by the linear modeling function. It was approx. 0, which seemed to indicate that this correlation is real, not just due to chance.
+
+The idea of segmenting the dataset into rich, poor and middle countries was formulated soon after this plot was observed. 
+We looked at the distribution of Log GDP per capita to decide how to segment the countries. 
+
+```{r out.width="50%"}
+# Does Logged GDP per capita follow normal curve?
+ggplot(data2019,aes(x=Logged.GDP.per.capita,y=..density..))+
+  geom_histogram(bins = 20,color='green')+
+  geom_vline(xintercept=mean(dataprev$Log.GDP.per.capita,na.rm=TRUE)-sd(dataprev$Log.GDP.per.capita,na.rm=TRUE),color="red")+
+  geom_vline(xintercept=mean(dataprev$Log.GDP.per.capita,na.rm=TRUE)+sd(dataprev$Log.GDP.per.capita,na.rm=TRUE),color="red")+
+  ggtitle("Does Log GDP per capita follow the normal curve? (Shashwat Bansal)")
+```
+
+Since the distribution looked roughly normal, we defined rich countries as those having Log GDP per capita >= one SD above average. We also defined poor countries as those having Log GDP per capita <= one SD below average. The rest were defined as middle countries
+
+
+#### Data Analysis
+
+Now, we wanted to see if the likelihood of people in rich countries being happier than average is higher than that of poor and middle countries.
+
+Our notion of happiness is defined by having an above average happiness ladder score.
+Since we defined these three categories and wanted to compare them, a chi squared test seemed like the logical thing to do.
+
+Chi Squared Test
+
+Null Hypothesis:
+a) The results are due to chance
+b) Rich, poor and middle countries are equally likely to report above average happiness ladder scores
+
+Alternative Hypothesis:
+a) The results are not due to chance
+b) Rich, poor, and middle countries vary in their likelihood of having above average happiness ladder scores.
+
+Test Statistic:
+
+```{r}
+rich_data = filter(dataprev,Log.GDP.per.capita>(mean(dataprev$Log.GDP.per.capita,na.rm=TRUE)+sd(dataprev$Log.GDP.per.capita,na.rm=TRUE)))
+poor_data = filter(dataprev,Log.GDP.per.capita<(mean(dataprev$Log.GDP.per.capita,na.rm=TRUE)-sd(dataprev$Log.GDP.per.capita,na.rm=TRUE)))
+middle_data = filter(dataprev,(Log.GDP.per.capita<(mean(dataprev$Log.GDP.per.capita,na.rm=TRUE)+sd(dataprev$Log.GDP.per.capita,na.rm=TRUE))) & (Log.GDP.per.capita>(mean(dataprev$Log.GDP.per.capita,na.rm=TRUE)-sd(dataprev$Log.GDP.per.capita,na.rm=TRUE))))
+avg_ladder = mean(dataprev$Life.Ladder,na.rm=TRUE)
+grand_total = length(rich_data$Life.Ladder)+length(poor_data$Life.Ladder)+length(middle_data$Life.Ladder)
+rich_more = length(filter(rich_data,Life.Ladder>avg_ladder)$Life.Ladder)
+poor_more = length(filter(poor_data,Life.Ladder>avg_ladder)$Life.Ladder)
+middle_more = length(filter(middle_data,Life.Ladder>avg_ladder)$Life.Ladder)
+more = c(rich_more,middle_more,poor_more)
+label = c("rich","middle","poor")
+less = c((length(rich_data$Country.name)-rich_more),(length(middle_data$Country.name)-middle_more),(length(poor_data$Country.name)-poor_more))
+test_frame = data.frame(label,more,less)
+num_more = rich_more+poor_more+middle_more
+num_less = grand_total-num_more
+print("This is table on which chi sq test is being done")
+test_frame
+### Chi Square test
+
+chisqr = ((rich_more-(length(rich_data$Life.Ladder)*num_more/grand_total))^2)/(length(rich_data$Life.Ladder)*num_more/grand_total)+
+  ((poor_more-(length(poor_data$Life.Ladder)*num_more/grand_total))^2)/(length(poor_data$Life.Ladder)*num_more/grand_total)+
+  ((middle_more-(length(middle_data$Life.Ladder)*num_more/grand_total))^2)/(length(middle_data$Life.Ladder)*num_more/grand_total)+
+  ((less[1]-(length(rich_data$Life.Ladder)*num_less/grand_total))^2)/(length(rich_data$Life.Ladder)*num_less/grand_total)+
+  ((less[2]-(length(middle_data$Life.Ladder)*num_less/grand_total))^2)/(length(middle_data$Life.Ladder)*num_less/grand_total)+
+  ((less[3]-(length(poor_data$Life.Ladder)*num_less/grand_total))^2)/(length(poor_data$Life.Ladder)*num_less/grand_total)
+print("chi sq statistic is ")
+print(chisqr)
+df = (3-1)*(2-1)
+p = 1-pchisq(chisqr,df)
+print("p value is")
+print(p)
+```
+
+The p value is approximately zero.
+Hence we can reject the null at the 1% level, and any variations is not due to chance variation. 
+
+
+
+
+```{r}
+rich_data$countrytypes <- factor(c("richcountry"))
+middle_data$countrytypes <- factor(c("middlecountry"))
+poor_data$countrytypes <- factor(c("poorcountry"))
+datanew <- rbind(rich_data, middle_data, poor_data, stringsAsFactors = TRUE)
+ggplot(datanew,aes(x=Log.GDP.per.capita,y=Life.Ladder,color=countrytypes))+
+  geom_point(alpha=0.1)+
+  geom_smooth(method='lm')+
+  geom_smooth(method='lm',color="black")+
+  ggtitle("Correlation between Happiness and GDP")+
+  labs(x="Logged GDP per capita",y="Happiness Score")
+```
+
+This matched our intuition that richer countries were more likely to have happier people.
+
+
+### Section B: GDP per capita and country wealth related to perceptions of corruption
+
+#### Exploratory Data Analysis/ Description of Data
+
+The primary goal of this section is to evaluate whether GDP per capita and country wealth are related to perceptions of corruption - and specifically, whether levels of corruption and country wealth are related to happiness levels.  Utilizing the country classification system defined previously within our code, countries were segmented into rich, poor, and middle groups depending on their logged GDP per capita - countries above one standard deviation of the mean log GDP per capita were classified as "rich," countries between one standard deviation above and below the mean were classified as in the "middle," and countries below one standard deviation below the mean were classified as "poor." Similarly, a rating system of high corruption, some corruption, and low corruption was created modelled on the wealth classification system as mentioned. 
+
+```{r, echo=FALSE}
+### Classification of Countries
+rich_data = filter(data2019,Logged.GDP.per.capita>(mean(data2019$Logged.GDP.per.capita)+sd(data2019$Logged.GDP.per.capita)))
+poor_data = filter(data2019,Logged.GDP.per.capita<(mean(data2019$Logged.GDP.per.capita)-sd(data2019$Logged.GDP.per.capita)))
+middle_data = filter(data2019,(Logged.GDP.per.capita<(mean(data2019$Logged.GDP.per.capita)+sd(data2019$Logged.GDP.per.capita))) & (Logged.GDP.per.capita>(mean(data2019$Logged.GDP.per.capita)-sd(data2019$Logged.GDP.per.capita))))
+
+###Creation of a new data frame with country wealth classifications. 
+rich_data$countrytypes <- factor(c("richcountry"))
+middle_data$countrytypes <- factor(c("middlecountry"))
+poor_data$countrytypes <- factor(c("poorcountry"))
+data2019new <- rbind(rich_data, middle_data, poor_data, stringsAsFactors = TRUE)
+```
+
+As an extension of the first section, which discusses the relation of logged GDP per capita to happiness, the primary goal of this section is to investigate whether a correlation between GDP per capita and perceptions of corruption exist, and to determine whether subsequent perceptions of corruption are therefore related to happiness. 
+
+```{r} 
+ggplot(data2019new, aes(x=Logged.GDP.per.capita, y=Perceptions.of.corruption, color=factor(Regional.indicator))) + geom_point() + ggtitle("Logged GDP Per Capita and Perceptions of Corruption (Anni Wang)") + labs(y= "Perceptions of Corruption", x = "Logged GDP Per Capita") + geom_smooth(method="lm", color="black") 
+```
+
+According to the scatterplot, there is a strong negative correlation between Logged GDP per capita and perceptions of corruption.  However, Rwanda exhibits the opposite graphical behavior, in that it displays both low logged GDP per capita as well as low perceptions of corruption, whereas other countries with low logged GDP per capita tend to have extremely high perceptions of corruption. Accoriding to BBC, Rwanda mainly has low levels of corruption due to its police state with severe punishments instituted for infractions - Transparency International has difficulty in producing comparisons of Rwanda against neighboring countries in terms of corruption due to extremely low reports and accounts of government bribery. According to the Rwanda Governance Scorecard 2019 (Rwanda Governance Board 2019), citizens in Rwanda place high trust within the Rwanda Police Force at a level of 96.5%. According to Transparency International Rwanda, "trust has been maintained over the last years in response to years of public sector purges that helped to significantly improve the police and military’s accountability to civilians." The government of Rwanda has implemented policies intended to curb corruption within its police force, including doubling of salaries, professionalism training, and creation of an ethics centre intended to develop the discipline of recruits and existing staff.
+
+#### Data Analysis
+
+In order to evaluate whether GDP per capita and country wealth are related to perceptions of corruption - and specifically, whether levels of corruption are related to happiness levels, the chi-squared, t-test, ANOVA, and Tukey hypothesis tests were utilized. 
+
+A t-test was utilized to address whether there was a significant difference between how rich and middle countries perceive corruption. The Welch's Two Sample T-Test was selected for this question - as I intend to observe whether there are differences between the means of corruption perceptions between two samples that were possibly unequal in their size. 
+```{r, echo=FALSE}
+#Is there a significant difference between how rich and middle countries perceive corruption?
+richandmiddlecountries <- rbind(rich_data, middle_data, stringsAsFactors = TRUE)
+t.test(Perceptions.of.corruption ~ countrytypes, data=richandmiddlecountries)
+###There is a significant difference - rich countries have a mean of 0.4799714, middle countries have a mean of 0.8024115, and the p value of 4.296e-09 indicates that there is a 
+#difference to how rich and middle countries perceive corruption. 
+```
+
+Assuming that the null hypothesis is that rich and middle countries are equal in terms of their average perception of corruption (and that any difference is due to chance variation), and that the alternative hypothesis is that rich and middle countries are not equal in terms of their average perception of corruption (and that any difference is not due to chance variation), Welch's Two Sample t-test, the p-value returned is 4.296e-09, which is highly significant. Therefore, the null hypothesis is rejected. It appears that there is a significant difference in terms of how wealthy and middle countries perceive corruption. Upon analysis of the countries that were placed in the rich category and middle categories, most of these countries operate on a very democratically-centered government in which citizens are actively participating and involved in public politics. Many countries placed in the middle, such as the Ivory Coast for example, have historically very totalitarian and dictator forms of government, contributing to a high perception of corruption within the countries.
+
+I then wanted to address: Is there a significant difference between how middle and poor countries perceive corruption?
+```{r, echo}
+middleandpoorcountries <- rbind(middle_data, poor_data, stringsAsFactors = TRUE)
+t.test(Perceptions.of.corruption ~ countrytypes, data=middleandpoorcountries)
+```
+I assume the same null hypothesis and alternative hypothesis as in the test above. Interestingly, the p-value is 0.05315, which is greater than 0.05. The averages are 0.8024115 for middle countries, and 0.7499701 for poor countries. There is not a significant difference between perceptions of corruption between middle and poor countries, leading to the failure of rejecting the null hypothesis. Upon analysis of governmental structure in middle and poor countries, several countries share similarities in both the middle and poor categories in terms of historical totalitarian government structures, such as the former historical dictator of Niger Sani Abacha, and Mobutu Sese Seko of the Democratic Republic of the Congo. 
+
+Finally, a chi-square test for independence was conducted to verify whether perceptions of corruption are independent of happiness level. First, I defined whether countries were considered high, medium, or low in terms of corruption perception utilizing historical data. The methodology is modeled from the rich, middle, and poor countries, as in highly corrupt countries are greater than one standard deviation above the mean, somewhat corrupt countries are between one standard deviation above and below the mean, and low corruption countries remain one standard deviation below the mean level of corruption. Happiness was split into two sections - countries were considered more happy if they are above the average level of happiness in the WHR20_previous_years data. 
+```{r, echo=FALSE}
+#Defining which countries are considered highlycorrupt, somecorrupt, and lowcorrupt. 
+
+high_corrupt= dplyr::filter(dataprev, Perceptions.of.corruption > (mean(dataprev$Perceptions.of.corruption, na.rm=TRUE) + sd(dataprev$Perceptions.of.corruption, na.rm=TRUE)))
+low_corrupt = dplyr::filter(dataprev, Perceptions.of.corruption <(mean(dataprev$Perceptions.of.corruption,na.rm=TRUE)-sd(dataprev$Perceptions.of.corruption,na.rm=TRUE)))
+middle_corrupt = dplyr::filter(dataprev,(Perceptions.of.corruption <(mean(dataprev$Perceptions.of.corruption,na.rm=TRUE)+sd(dataprev$Perceptions.of.corruption,na.rm=TRUE))) & (Perceptions.of.corruption>(mean(dataprev$Perceptions.of.corruption,na.rm=TRUE)-sd(dataprev$Perceptions.of.corruption,na.rm=TRUE))))
+
+#Defining whether corrupt countries are considered more happy or less happy
+avg_laddercorrupt = mean(dataprev$Life.Ladder,na.rm=TRUE)
+grand_totalcorrupt = length(high_corrupt$Life.Ladder)+length(middle_corrupt$Life.Ladder)+length(low_corrupt$Life.Ladder)
+highlycorruptmore = length(dplyr::filter(high_corrupt,Life.Ladder>avg_laddercorrupt)$Life.Ladder)
+littlecorruptmore = length(dplyr::filter(low_corrupt,Life.Ladder>avg_laddercorrupt)$Life.Ladder)
+mediumcorruptmore = length(dplyr::filter(middle_corrupt,Life.Ladder>avg_laddercorrupt)$Life.Ladder)
+
+corruptmorehappy = c(highlycorruptmore,mediumcorruptmore,littlecorruptmore)
+labelcorruption = c("highly corruption", "some corruption", "low corruption")
+corruptlesshappy = c((length(high_corrupt$Country.name)-highlycorruptmore),(length(middle_corrupt$Country.name)-mediumcorruptmore),(length(low_corrupt$Country.name)-littlecorruptmore))
+
+#I put data in two forms to visualize it: one in a corruption data, and one in a data table.
+corruptiondata = data.frame(labelcorruption,corruptmorehappy,corruptlesshappy)
+corruptiondatatable <- as.table(rbind(corruptmorehappy, corruptlesshappy))
+
+
+corruption_more = highlycorruptmore + littlecorruptmore + mediumcorruptmore
+corruption_less = grand_totalcorrupt-corruptmorehappy
+
+chisq.test(corruptiondatatable)
+```
+The p-value for this Chi-squared test is < 2.2e-16. There is an undeniable relationship between happiness and perceptions of corruption - which is intuitive, as high perceptions of corruption likely limits individual freedoms, and therefore leads to low happiness levels. According to Nina Gorovaia and Stavros A. Zenios - development is a process of expanding the real freedoms and activities that people enjoy, which is directly related to increasing happiness (which is also interchangeably defined as life satisfaction). 
+
+
+
+I now intend to address the second part of my question: whether country wealth is related to happiness levels. An ANOVA test was utilized to determine whether there are significant differences in the level of happiness, between countries that are rated wealthy countries, medium wealthy countries, and poor countries. My null hypothesis is that the three categories of countries have similar mean happiness levels, and that variation is due to chance. Similarly, the alternative hypothesis states that at least one category is different than the two others, and that this is not due to chance variation. 
+
+```{r out.width = "50%"}
+ggboxplot(data2019new, x= "countrytypes", y="Ladder.score", ylab = "Happiness Level", xlab = "Wealth of Country", title = "Wealth of Country and Happiness Level")
+
+```
+
+According to the box plots above, a clear difference can be seen between the averages of the rich country, middle country, and poor countries in terms of happiness levels. However, the p value returned by the ANOVA test is <2e-16 - as trends are shown in the plot, at least one of the categories of richcountry, middlecountry, and poorcountry is significantly different in terms of their mean happiness level. 
+
+```{r}
+
+countrytype.aov <- aov(Ladder.score ~ countrytypes, data=data2019new)
+summary(countrytype.aov)
+countrytypeTUKEY <- TukeyHSD(x=countrytype.aov, 'countrytypes', conf.level=0.95)
+par(mar=c(5, 8, 5, 2))
+plot(countrytypeTUKEY, las=1, col="black", cex.main=1, cex.lab=1.25, cex.axis=0.5)
+mtext(text="Colors", side=1, line=6.5)
+```
+Similarly, as trends are shown above - middle countries and rich countries are visually much more similar compared to poor countries and middle countries, but poor countries and rich countries are much more difference in terms of their mean levels. 
+
+
+### Section C: Social Support and Healthy Life Expectancy
+
+#### Exploratory Data Analysis/ Description of Data
+
+
+```{r out.width="50%"}
+#Estimated division among the data based on the gdp level. (+1 sd for rich, -1 sd for poor, and between -1 and 1 sd for middle)
+### Classification of Countries
+rich_data = filter(data2019,Logged.GDP.per.capita>(mean(data2019$Logged.GDP.per.capita)+sd(data2019$Logged.GDP.per.capita)))
+poor_data = filter(data2019,Logged.GDP.per.capita<(mean(data2019$Logged.GDP.per.capita)-sd(data2019$Logged.GDP.per.capita)))
+middle_data = filter(data2019,(Logged.GDP.per.capita<(mean(data2019$Logged.GDP.per.capita)+sd(data2019$Logged.GDP.per.capita))) & (Logged.GDP.per.capita>(mean(data2019$Logged.GDP.per.capita)-sd(data2019$Logged.GDP.per.capita))))
+
+rich_data$countrytypes <- factor(c("richcountry"))
+middle_data$countrytypes <- factor(c("middlecountry"))
+poor_data$countrytypes <- factor(c("poorcountry"))
+data2019new <- rbind(rich_data, middle_data, poor_data, stringsAsFactors = TRUE)
+
+rich_data$countrytypes <- factor(c("richcountry"))
+middle_data$countrytypes <- factor(c("middlecountry"))
+poor_data$countrytypes <- factor(c("poorcountry"))
+data2019new <- rbind(rich_data, middle_data, poor_data, stringsAsFactors = TRUE)
+
+#Scatter plot of the richer countries with regression line to test whether there is a linear relationship between healthy life expectancy and social support
+ggplot(data2019new,aes(x=Social.support,y=Healthy.life.expectancy,color=countrytypes))+geom_point()+
+  geom_smooth(method="lm",se=FALSE)+
+  ggtitle("Healthy life expectancy vs Social support-Robert Lee")
+```
+Scatter plot of the countries with regression line to test whether there is a linear relationship between healthy life expectancy and social support
+```{r out.width="50%"}
+ggplot(data2019new,aes(x=Healthy.life.expectancy,y=Ladder.score,color=countrytypes))+geom_smooth(method="lm",se=FALSE)+geom_point()+ggtitle("Healthy life expectancy vs happiness levels-Robert Lee")
+```
+Scatter plot of the countries with regression line to test whether there is a linear relationship between healthy life expectancy and happiness levels
+
+#### Data Analysis
+
+```{r}
+
+rich_data$countrytypes <- factor(c("richcountry"))
+middle_data$countrytypes <- factor(c("middlecountry"))
+poor_data$countrytypes <- factor(c("poorcountry"))
+data2019new <- rbind(rich_data, middle_data, poor_data, stringsAsFactors = TRUE)
+
+#Creates a new data set of just the rich and middle countries. Then, a T test that compares whether a country being rich or mid affects the health life expectancy. 
+richandmiddlecountries <- rbind(rich_data, middle_data, stringsAsFactors = TRUE)
+t.test(Healthy.life.expectancy ~ countrytypes, data=richandmiddlecountries)
+```
+Then, a T test that compares whether a country being rich or mid affects the health life expectancy.
+```{r}
+
+#Creates a new data set of just the middle and poor countries. Then, a T test that compares whether a country being mid or poor affects the health life expectancy
+middleandpoorcountries <- rbind(middle_data, poor_data, stringsAsFactors = TRUE)
+t.test(Healthy.life.expectancy ~ countrytypes, data=middleandpoorcountries)
+```
+Then, a T test that compares whether a country being mid or poor affects the health life expectancy.
+```{r}
+
+#Creates a new data set of just the rich and poor countries. Then, a T test that compares whether a country being rich or poor affects the health life expectancy
+richandpoorcountries<- rbind(rich_data, poor_data, stringsAsFactors = TRUE)
+t.test(Healthy.life.expectancy ~ countrytypes, data=richandpoorcountries)
+```
+A T test that compares whether a country being rich or poor affects the health life expectancy
+For both the data for the low-gdp countries and mid-gdp countries we use the linear model, which had an r^2 value that indicated a linear relationship and a low p-value under 0.05 respectively based on a t-test that indicated significant evidence whether there is a relationship between the amount of social services and the life expectancy. However, the high-gdp countries had an r^2 value and had a p-value of 0.1446 that did not indicate a strong linear relationship between the amount of social services and the life expectancy or provide evidence that there is a relationship between the amount of social services and life expectancy. 
+
+Through t-test, we observed a low p-value in the t-test comparing the healthy life expectancy between the rich and poor countries, rich and middle, and poor and middle, therefore we have significant evidence that there is a difference in life-expectancy between each of these two groups of countries. 
+
+
+
+### Section D: Freedom of Life Choices on Happiness Levels
+
+```{r}
+rich_countries_data = filter(data2019,Logged.GDP.per.capita>(mean(data2019$Logged.GDP.per.capita)+sd(data2019$Logged.GDP.per.capita))) 
+poor_countries_data = filter(data2019,Logged.GDP.per.capita<(mean(data2019$Logged.GDP.per.capita)-sd(data2019$Logged.GDP.per.capita))) 
+middle_countries_data=filter(data2019,(Logged.GDP.per.capita<(mean(data2019$Logged.GDP.per.capita)+sd(data2019$Logged.GDP.per.capita))) & (Logged.GDP.per.capita>(mean(data2019$Logged.GDP.per.capita)-sd(data2019$Logged.GDP.per.capita))))
+```
+
+#### Exploratory Data Analysis
+
+The debate over freedom has seen new battlegrounds in light of the Covid-19 pandemic, as strong totalitarian lockdowns have proved to be effective in restricting the spread of the virus, and democratic countries find themselves struggling to balance their citizens' freedoms with the necessity of a national lockdown. Are the benefits of freedom real? Are they the same across different societies? What factors contribute to freedom in a society? With a little bit of exploratory data analysis, perhaps one can glean new insights into these questions. 
+
+Let's start by looking at the correlation between Freedom to Make Life Choices, a score between 0 and 1 given by citizens of the country being evaluated, and the overall happiness Ladder Score of a country, a value between 0 and 10 that measures the average response of a country's citizen's when asked how happy they were.
+
+```{r out.width="50%"}
+rich_countries_data$countrytypes <- factor(c("richcountry"))
+middle_countries_data$countrytypes <- factor(c("middlecountry"))
+poor_countries_data$countrytypes <- factor(c("poorcountry"))
+data2019new <- rbind(rich_countries_data, middle_countries_data, poor_countries_data, stringsAsFactors = TRUE)
+ggplot(data2019new, aes(x=Freedom.to.make.life.choices, y=Ladder.score, color=countrytypes)) + 
+  geom_point() + 
+  geom_smooth(method="lm", se = FALSE) +
+  geom_smooth(method = "lm", se = FALSE, col = "black") +
+  ggtitle("Happiness and Freedom (Allen Chen)") +
+  xlab("Freedom to Make Life Choices score") +
+  ylab("Happiness Ladder score")
+print("Correlation between happiness ladder score and freedom")
+cor(data2019$Freedom.to.make.life.choices, data2019$Ladder.score)
+print("Correlation between happiness and freedom in rich countries")
+cor(rich_countries_data$Freedom.to.make.life.choices, rich_countries_data$Ladder.score)
+print("Correlation between happiness and freedom in poor countries")
+cor(poor_countries_data$Freedom.to.make.life.choices, poor_countries_data$Ladder.score)
+```
+
+Using our predefined definitions of rich, middle and poor countries (the upper and lower 15% of countries ranked by log GDP), we can look at this same correlation between freedom and happiness within rich and poor countries. On the plot, each country type has been color-coded and their individual regression lines have been drawn.
+
+It would appear that the correlation is stronger in rich countries than it is in poor countries. 
+
+What factors are correlated with a country's freedom, then? Looking at both the overall data and then the individual rich and poor segments, it seems that there is in fact a strong correlation between a nation's level of social support and the self-percieved freedom of their citizens. 
+
+```{r out.width="50%"}
+ggplot(data2019, aes(y=Freedom.to.make.life.choices, x=Social.support)) + 
+  geom_point() + 
+  geom_smooth(method = lm) +
+  ggtitle("Social Support and Freedom") +
+  xlab("Freedom to Make Life Choices score") +
+  ylab("Social Support score")
+```
+
+#### Data Analysis
+
+Within this exploration of the data, a recurring theme in the analysis of the correlations between freedom, happiness, and social support was that rich countries seem to have a greater correlation than poorer ones. We can see whether these differences are due to random chance or not by using a hypothesis test. 
+
+To start, let's see whether the difference in average freedom between rich and poor countries is real. Our null hypothesis is that the observed difference is due to chance, giving us an expected difference of zero. Our alternative states that the observed difference is real and not chance, and that there are factors between rich and poor countries that cause their freedom scores to differ. 
+
+```{r, echo = FALSE}
+freedom_means = c(mean(rich_countries_data$Freedom.to.make.life.choices), mean(poor_countries_data$Freedom.to.make.life.choices))
+print(freedom_means)
+print("These are the mean freedom scores of the rich and poor countries, respectively")
+fre_rich_se = sd(rich_countries_data$Freedom.to.make.life.choices,na.rm=T)/sqrt(length(rich_countries_data$Freedom.to.make.life.choices))
+fre_poor_se = sd(poor_countries_data$Freedom.to.make.life.choices,na.rm=T)/sqrt(length(poor_countries_data$Freedom.to.make.life.choices))
+fre_se_diff = sqrt(fre_rich_se^2 + fre_poor_se^2)
+print(fre_se_diff)
+print("Using R and the law of averages, we find the SE of the difference of means")
+fre_obs_diff = freedom_means[1] - freedom_means[2]
+print(fre_obs_diff)
+print("This is the observed difference of the means")
+1 - pnorm((fre_obs_diff - 0) / fre_se_diff)
+print("And this is the p-value")
+```
+
+The p-value in this case is highly significant, which tells us that the difference in the means is most likely not due to chance. There is a real, significant difference between the freedom of rich countries and the freedom of poor countries. 
+
+### Conclusion 
+
+In general, wealth is an indicator for happiness ladder scores - rich, poor, and middle countries have different likelihoods of reporting above average happiness ladder scores. Combining these findings with the findings from the scatterplot one in Section A, we can infer that richer countries are more likely to report above average happiness scores than poor and middle countries.In terms of likelihood of reporting above average happiness ladder scores, generally countries follow the trend that wealthier countries will have the greatest likelihood of reporting a higher happiness ladder score, followed by middle countries, and then poor countries. In terms of the relationship between GDP per capita and perceptions of corruption, there appears to be a strong negative correlation between Logged GDP per capita and perceptions of corruption. Analysis in section B revealed that wealthier countries appeared to follow a more democratically structured government, in which citizens had high levels of civic and political participations and freedoms, leading to a lower perception of corruption.  Many countries placed in the middle and lower sectors of wealth, such as the Ivory Coast for example, have historically very totalitarian and dictator forms of government, contributing to a high perception of corruption within the countries. While keeping in mind the strong dependent relationship between happiness ladder scores and perception of corruption - countries with higher perceptions of corruption (which were usually in the lower economic sector of middle and lower wealth) had much lower ladder happiness scores than wealthier countries (with very democratically centered governments and traditionally high personal freedom levels), which had much higher ladder happiness scores. In fact, according to Section D, wealthier governments are more able to provide higher levels of social support, leading to higher happiness ladder scores. 
+In low-gdp countries and mid-gdp countries have more of a correlation between social services and life expectancy than the high-gdp countries because with the LDC countries because the lack social support from the government would most likely affect their living conditions and life expectancy, which in turn affects the happiness level of the people. In high-gdp countries there is a low correlation between social services and life expectancy because with high-gdp countries, because of the prevalence of social support provided, there is a less of an effect on the life expectancy, which in turn has less of an effect on the over happiness of the people in high-gdp countries.We can see an example of the effect of lack of social services in poor countries that effect life expectancy and happiness. For example, according to an nih study, fanthun and colleagues showed that low social support for mother’s and care takers increased the mortality rate, which would decrease life expectancy. Also, in the nih study, nilsson and colleagues analyzed the relationship between social capital and self expressed quality of life in rural bangladesh. They analyzed that these lack of social capital provided by the government decreased the self expressed quality of life, which provides some evidence that the lack of social support from government can lead to lack of happiness.
+
+
+### References
+
+
+https://www.bbc.com/news/world-africa-10726324
+
+https://knowledgehub.transparency.org/helpdesk/curbing-corruption-in-the-police-in-rwanda
+
+https://www.newtimes.co.rw/section/read/30573
+
+https://www.britannica.com/biography/Mobutu-Sese-Seko
+
+https://www.cnn.com/2019/06/05/africa/nigeria-abacha-stolen-loot-jersey-intl/index.html
+
+https://www.researchgate.net/publication/233406564_Does_freedom_lead_to_happiness_Economic_growth_and_quality_of_life
+
+https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4318243/
+
