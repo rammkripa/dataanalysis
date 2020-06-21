@@ -1,0 +1,135 @@
+---
+title: 'Coronavirus!'
+author: "Ram Mukund Kripa"
+output: md_document
+toc: no
+---
+
+### Introduction
+
+I am starting out with a very simple question: Are rich countries or poor countries affected more by the coronavirus?
+I am using GDP as an indicator of "richness" even though this may or may not be the most accurate representation possible.
+
+
+``` {r}
+# packages and data is read in
+library(dplyr)
+library(ggplot2)
+corona = read.csv("~/Downloads/owid-covid-data.csv")
+recent = filter(corona,date=='2020-05-25')
+recent = filter(recent,location!='World')
+```
+
+### Exploration
+
+Are GDP and total cases correlated?
+
+```{r}
+# is there a correlation between gdp per capita and total cases?
+ggplot(recent,aes(x=gdp_per_capita,y=total_cases))+
+  geom_point(color="skyblue")+
+  geom_smooth(method='lm')
+x = lm(gdp_per_capita ~ total_cases,recent)
+summary(x)
+#seems to be a slightly positive correlation
+
+```
+
+This didn't really yield any conclusive results.
+However, what if we compared the GDP per capita with the number of cases per million?
+If we compare both on a scale of per person, we should get more reliable results!
+
+```{r}
+ggplot(recent,aes(x=gdp_per_capita,y=total_cases_per_million))+
+  geom_point(color="skyblue")+
+  geom_smooth(method='lm')
+x = lm(gdp_per_capita ~ total_cases_per_million,recent)
+summary(x)
+```
+
+From this it would seem that higher GDP indicates more cases?
+That doesn't seem right!
+I think one confounding factor might be testing.
+```{r}
+ggplot(recent,aes(x=gdp_per_capita,y=total_tests_per_thousand))+
+  geom_point()+
+  geom_smooth(method='lm')
+summary(lm(gdp_per_capita~total_tests_per_thousand,recent))
+```
+```{r}
+ggplot(recent,aes(x=total_cases_per_million,y=total_tests_per_thousand))+
+  geom_point()+
+  geom_smooth(method='lm')
+summary(lm(total_cases_per_million~total_tests_per_thousand,recent))
+```
+Since there is high correlation between gdp and cases, it seems likely that the data doesn't tell the full story.
+
+### Hypothesis test
+
+```{r}
+## A hypothesis test:
+## Are no. of tests per thousand and no. of cases per million independent
+## Let's do a chi squared test
+### but first
+frame2 = filter(recent,!(is.na(total_tests_per_thousand)))
+ggplot(frame2,aes(x=total_cases_per_million,y=total_tests_per_thousand))+
+  geom_point()+
+  geom_smooth(method='lm')
+summary(lm(total_cases_per_million~total_tests_per_thousand,frame2))
+###
+avg_tests = mean(frame2$total_tests_per_thousand)
+avg_cases = mean(frame2$total_cases_per_million)
+above_avg_test = filter(frame2,total_tests_per_thousand>avg_tests)
+below_avg_test = filter(frame2,total_tests_per_thousand<avg_tests)
+aa = length(filter(above_avg_test,total_cases_per_million>avg_cases)$iso_code)
+ab = length(filter(above_avg_test,total_cases_per_million<avg_cases)$iso_code)
+ba = length(filter(below_avg_test,total_cases_per_million>avg_cases)$iso_code)
+bb = length(filter(below_avg_test,total_cases_per_million<avg_cases)$iso_code)
+actual = c(aa,ab,ba,bb)
+evaa = (aa+ab)*(aa+ba)/(aa+ab+ba+bb)
+evab = (aa+ab)*(ab+bb)/(aa+ab+ba+bb)
+evba = (ba+bb)*(ba+aa)/(aa+ab+ba+bb)
+evbb = (bb+ab)*(bb+ba)/(aa+ab+ba+bb)
+exp = c(evaa,evab,evba,evbb)
+chisqr = sum(((actual-exp)^2)/exp)
+pval = (1-pchisq(chisqr,df=1))*100
+pval
+```
+Since the p value is 1.32%
+We can see that these are clearly dependent
+### Some Linear Modelling
+
+```{r}
+
+## okay so now linear modelling
+### training
+usa_data = filter(corona,iso_code=="USA")
+usa_data$dayno = 1:147
+ggplot(usa_data,aes(x=total_tests_per_thousand,y=total_cases_per_million))+
+  geom_point()+
+  geom_smooth(method='lm')
+plot(total_cases_per_million~total_tests_per_thousand,usa_data)
+fit1 = lm(total_cases_per_million~total_tests_per_thousand+I(total_tests_per_thousand^2)+I(total_tests_per_thousand^4),usa_data)
+fit1
+summary(fit1)
+plot(total_cases_per_million~total_tests_per_thousand,usa_data)
+x = usa_data$total_tests_per_thousand
+points(x[!is.na(x)],fitted(fit1),col='blue',pch=8)
+### model has been created
+
+## now to see if it predicts well
+
+## Inputting new data
+
+corona_updated = read.csv("~/Downloads/owid-covid-data-updated.csv")
+usa_new = filter(corona_updated,iso_code=="USA")
+usa_new$dayno = 1:length(usa_new$total_cases_per_million)
+##predict(fit1)
+test_data = filter(usa_new,(dayno<158 & dayno>146))
+prediction_data = predict(fit1,data.frame(total_tests_per_thousand=test_data$total_tests_per_thousand),interval="confidence")
+predicted_values = prediction_data[1:11]
+test_data$predicted_values = predicted_values
+ggplot(test_data)+
+  geom_point(aes(x=total_tests_per_thousand,y=total_cases_per_million,col='red'))+
+  geom_point(aes(x=total_tests_per_thousand,y=predicted_values,col='blue'))
+```
