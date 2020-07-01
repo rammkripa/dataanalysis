@@ -6,10 +6,16 @@ tidied_dat = dat %>%
 by_month = tidied_dat %>%
   group_by(Month)
 
-jjabreaks = tidied_dat %>%
-  filter(PRCP<=3,(Month=='06'|Month=='07'|Month=='08'))
-summ = jjabreaks %>%
+jja <- tidied_dat %>%
+  filter((Month=='06'|Month=='07'|Month=='08'))
+summ <- jja %>%
+  filter(Year>=1976 & Year<2020)%>%
   group_by(Year)%>%
+  filter(PRCP<=3)%>%
   summarize(count=n())
-ggplot(summ,aes(x=Year,y=count))+
+p <- ggplot(summ,aes(x=Year,y=count))+
   geom_point()
+spline.d <- as.data.frame(spline(summ$Year, summ$count))
+p + geom_line(data = spline.d, aes(x = x, y = y))
+ggplot(data = spline.d, aes(x = x, y = y))+
+  geom_line()
