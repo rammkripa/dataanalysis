@@ -1,0 +1,65 @@
+---
+title: "ghcn_analysis"
+author: "Ram Mukund Kripa"
+date: `r lubridate::today()`
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning=FALSE,
+                      message=FALSE)
+library(tidyverse)
+library(lubridate)
+```
+
+```{r getting_data}
+## Loading Stuff First
+
+tidied_dat <- function(stringy){
+  read_csv(stringy) %>%
+  mutate(DATE=lubridate::ymd(DATE),PRCP=as.numeric(PRCP))
+}
+
+files <- list.files(path="data",pattern="*.csv",full.names=TRUE)
+output <- list()
+for (i in files){
+  output[[i]] <- tidied_dat(i)
+}
+rainData <- output %>%
+  bind_rows(.id=NULL)
+glimpse(rainData)
+
+```
+
+## Analysis of JJA Period
+
+```{r}
+
+jjaResults <- rainData %>%
+  filter(month(DATE) %in% c(6,7,8)) %>%
+  mutate(YEAR=year(DATE)) %>%
+  group_by(NAME,YEAR) %>%
+  summarize(total=sum(PRCP,na.rm=TRUE),numBreaks=sum(PRCP<=3,na.rm=TRUE)) %>%
+  filter(YEAR>1976 & YEAR<2020)
+
+jjaResults  %>%
+  ggplot(mapping = aes(x=YEAR,y=numBreaks,color=NAME))+
+  geom_line()
+
+```
+
+
+```{r}
+jjaResults %>%
+  ggplot(mapping = aes(x=total,color=NAME))+
+  geom_freqpoly(bins=15)
+```
+
+```{r}
+
+```
+
+```{r}
+```
+
